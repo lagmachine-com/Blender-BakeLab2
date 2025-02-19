@@ -192,7 +192,38 @@ class Baker(Operator):
             emit = nodes.new(type = 'ShaderNodeEmission')
             emit.inputs[0].default_value = 0, 0, 0, 0
             links.new(emit.outputs[0], out.inputs[0])
-            
+
+    def aov_to_emit_node(self, mat, aov_name):
+        nodes = mat.node_tree.nodes
+        links = mat.node_tree.links
+
+        out = self.find_node(nodes, 'OUTPUT_MATERIAL')
+        
+        aov_node = None
+        for node in nodes:
+            if node.type == 'OUTPUT_AOV' and node.aov_name == aov_name:
+                aov_node = node
+                print("Found aov node:")
+                print(aov_node)
+
+                if len(aov_node.inputs[0].links):
+                    link = aov_node.inputs[0].links[0]
+                    links.new(link.from_socket, out.inputs[0])
+                    print("Connected aov color output")
+                else:
+                    emit = nodes.new(type = 'ShaderNodeEmission')
+                    emit.inputs[0].default_value = aov_node.inputs[0].default_value
+                    links.new(emit.outputs[0], out.inputs[0])
+                    print("Using aov default value")
+
+                return
+    
+        print("Couldnt find aov node")
+        out = nodes.new(type = 'ShaderNodeOutputMaterial')
+        emit = nodes.new(type = 'ShaderNodeEmission')
+        emit.inputs[0].default_value = 0, 0, 0, 0
+        links.new(emit.outputs[0], out.inputs[0])
+
     def copy_node(self, dst_nodes, node):
         try:
             new_node = dst_nodes.new(type = node.bl_idname)
@@ -535,7 +566,7 @@ class Baker(Operator):
                 if map.type == 'CustomPass':
                     if map.deep_search:
                         self.ungroup_nodes(mat.node_tree)
-                    self.passes_to_emit_node(mat, map.pass_name)
+                    self.aov_to_emit_node(mat, map.pass_name)
                 if map.type == 'Albedo':
                     self.ungroup_nodes(mat.node_tree)
                     self.passes_to_emit_node(mat, 'Albedo,Color,Base Color,Col,Paint Color')
